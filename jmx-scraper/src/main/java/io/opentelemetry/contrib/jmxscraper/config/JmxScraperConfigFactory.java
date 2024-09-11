@@ -13,37 +13,32 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 @SuppressWarnings({"SystemOut", "SystemExitOutsideMain"})
 public class JmxScraperConfigFactory {
   private static final String PREFIX = "otel.";
-  private static final String SERVICE_URL = PREFIX + "jmx.service.url";
-  private static final String CUSTOM_JMX_SCRAPING_CONFIG =
-      PREFIX + "jmx.custom.jmx.scraping.config";
-  private static final String TARGET_SYSTEM = PREFIX + "jmx.target.system";
-  private static final String INTERVAL_MILLISECONDS = PREFIX + "jmx.interval.milliseconds";
-  private static final String METRICS_EXPORTER_TYPE = PREFIX + "metrics.exporter";
-  private static final String EXPORTER = PREFIX + "exporter.";
-  private static final String REGISTRY_SSL = PREFIX + "jmx.remote.registry.ssl";
-  private static final String EXPORTER_INTERVAL = PREFIX + "metric.export.interval";
+  static final String SERVICE_URL = PREFIX + "jmx.service.url";
+  static final String CUSTOM_JMX_SCRAPING_CONFIG = PREFIX + "jmx.custom.jmx.scraping.config";
+  static final String TARGET_SYSTEM = PREFIX + "jmx.target.system";
+  static final String INTERVAL_MILLISECONDS = PREFIX + "jmx.interval.milliseconds";
+  static final String METRICS_EXPORTER_TYPE = PREFIX + "metrics.exporter";
+  static final String EXPORTER_INTERVAL = PREFIX + "metric.export.interval";
+  static final String REGISTRY_SSL = PREFIX + "jmx.remote.registry.ssl";
 
-  private static final String OTLP_ENDPOINT = EXPORTER + "otlp.endpoint";
+  static final String OTLP_ENDPOINT = PREFIX + "exporter.otlp.endpoint";
 
-  private static final String PROMETHEUS_HOST = EXPORTER + "prometheus.host";
-  private static final String PROMETHEUS_PORT = EXPORTER + "prometheus.port";
-
-  private static final String JMX_USERNAME = PREFIX + "jmx.username";
-  private static final String JMX_PASSWORD = PREFIX + "jmx.password";
-  private static final String JMX_REMOTE_PROFILE = PREFIX + "jmx.remote.profile";
-  private static final String JMX_REALM = PREFIX + "jmx.realm";
+  static final String JMX_USERNAME = PREFIX + "jmx.username";
+  static final String JMX_PASSWORD = PREFIX + "jmx.password";
+  static final String JMX_REMOTE_PROFILE = PREFIX + "jmx.remote.profile";
+  static final String JMX_REALM = PREFIX + "jmx.realm";
 
   // These properties need to be copied into System Properties if provided via the property
   // file so that they are available to the JMX Connection builder
-  private static final List<String> JAVA_SYSTEM_PROPERTIES =
+  static final List<String> JAVA_SYSTEM_PROPERTIES =
       Arrays.asList(
           "javax.net.ssl.keyStore",
           "javax.net.ssl.keyStorePassword",
@@ -52,7 +47,7 @@ public class JmxScraperConfigFactory {
           "javax.net.ssl.trustStorePassword",
           "javax.net.ssl.trustStoreType");
 
-  private static final List<String> AVAILABLE_TARGET_SYSTEMS =
+  static final List<String> AVAILABLE_TARGET_SYSTEMS =
       Arrays.asList(
           "activemq",
           "cassandra",
@@ -94,6 +89,8 @@ public class JmxScraperConfigFactory {
 
     JmxScraperConfig config = createConfig(loadedProperties);
     validateConfig(config);
+    populateJmxSystemProperties();
+
     return config;
   }
 
@@ -128,25 +125,20 @@ public class JmxScraperConfigFactory {
     JmxScraperConfig config = new JmxScraperConfig();
 
     config.serviceUrl = properties.getProperty(SERVICE_URL);
-    config.customJmxScrapingConfig = properties.getProperty(CUSTOM_JMX_SCRAPING_CONFIG);
-    config.targetSystem =
+    config.customJmxScrapingConfigPath = properties.getProperty(CUSTOM_JMX_SCRAPING_CONFIG);
+    String targetSystem =
         properties.getProperty(TARGET_SYSTEM, "").toLowerCase(Locale.ENGLISH).trim();
 
     List<String> targets =
-        Arrays.asList(
-            isBlank(config.targetSystem) ? new String[0] : config.targetSystem.split(","));
-    config.targetSystems = new LinkedHashSet<>(targets);
+        Arrays.asList(isBlank(targetSystem) ? new String[0] : targetSystem.split(","));
+    config.targetSystems = targets.stream().map(String::trim).collect(Collectors.toSet());
 
-    int interval = getProperty(INTERVAL_MILLISECONDS, 10000);
-    config.intervalMilliseconds = interval == 0 ? 10000 : interval;
-    // set for autoconfigure usage
-    getAndSetProperty(EXPORTER_INTERVAL, config.intervalMilliseconds);
+    int interval = getProperty(INTERVAL_MILLISECONDS, 0);
+    config.intervalMilliseconds = (interval == 0 ? 10000 : interval);
+    getAndSetPropertyIfUndefined(EXPORTER_INTERVAL, config.intervalMilliseconds);
 
-    config.metricsExporterType = getAndSetProperty(METRICS_EXPORTER_TYPE, "logging");
+    config.metricsExporterType = getAndSetPropertyIfUndefined(METRICS_EXPORTER_TYPE, "logging");
     config.otlpExporterEndpoint = properties.getProperty(OTLP_ENDPOINT);
-
-    config.prometheusExporterHost = getAndSetProperty(PROMETHEUS_HOST, "0.0.0.0");
-    config.prometheusExporterPort = getAndSetProperty(PROMETHEUS_PORT, 9464);
 
     config.username = properties.getProperty(JMX_USERNAME);
     config.password = properties.getProperty(JMX_PASSWORD);
@@ -156,6 +148,10 @@ public class JmxScraperConfigFactory {
 
     config.registrySsl = Boolean.parseBoolean(properties.getProperty(REGISTRY_SSL));
 
+    return config;
+  }
+
+  private void populateJmxSystemProperties() {
     // For the list of System Properties, if they have been set in the properties file
     // they need to be set in Java System Properties.
     JAVA_SYSTEM_PROPERTIES.forEach(
@@ -170,8 +166,6 @@ public class JmxScraperConfigFactory {
             System.setProperty(key, value);
           }
         });
-
-    return config;
   }
 
   private int getProperty(String key, int defaultValue) {
@@ -189,7 +183,7 @@ public class JmxScraperConfigFactory {
   /**
    * Similar to getProperty(key, defaultValue) but sets the property to default if not in object.
    */
-  private String getAndSetProperty(String key, String defaultValue) {
+  private String getAndSetPropertyIfUndefined(String key, String defaultValue) {
     String propVal = properties.getProperty(key, defaultValue);
     if (propVal.equals(defaultValue)) {
       properties.setProperty(key, defaultValue);
@@ -197,7 +191,7 @@ public class JmxScraperConfigFactory {
     return propVal;
   }
 
-  private int getAndSetProperty(String key, int defaultValue) {
+  private int getAndSetPropertyIfUndefined(String key, int defaultValue) {
     int propVal = getProperty(key, defaultValue);
     if (propVal == defaultValue) {
       properties.setProperty(key, String.valueOf(defaultValue));
@@ -211,7 +205,7 @@ public class JmxScraperConfigFactory {
       throw new ConfigurationException(SERVICE_URL + " must be specified.");
     }
 
-    if (isBlank(config.customJmxScrapingConfig) && isBlank(config.targetSystem)) {
+    if (isBlank(config.customJmxScrapingConfigPath) && config.targetSystems.isEmpty()) {
       throw new ConfigurationException(
           CUSTOM_JMX_SCRAPING_CONFIG + " or " + TARGET_SYSTEM + " must be specified.");
     }

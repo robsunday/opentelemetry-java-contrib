@@ -11,16 +11,12 @@ import java.util.Set;
 /** This class keeps application settings */
 public class JmxScraperConfig {
   String serviceUrl = "";
-  String customJmxScrapingConfig = "";
-  String targetSystem = "";
+  String customJmxScrapingConfigPath = "";
   Set<String> targetSystems = Collections.emptySet();
   int intervalMilliseconds;
   String metricsExporterType = "";
 
   String otlpExporterEndpoint = "";
-
-  String prometheusExporterHost = "";
-  int prometheusExporterPort;
 
   String username = "";
   String password = "";
@@ -34,12 +30,8 @@ public class JmxScraperConfig {
     return serviceUrl;
   }
 
-  public String getCustomJmxScrapingConfig() {
-    return customJmxScrapingConfig;
-  }
-
-  public String getTargetSystem() {
-    return targetSystem;
+  public String getCustomJmxScrapingConfigPath() {
+    return customJmxScrapingConfigPath;
   }
 
   public Set<String> getTargetSystems() {
@@ -56,14 +48,6 @@ public class JmxScraperConfig {
 
   public String getOtlpExporterEndpoint() {
     return otlpExporterEndpoint;
-  }
-
-  public String getPrometheusExporterHost() {
-    return prometheusExporterHost;
-  }
-
-  public int getPrometheusExporterPort() {
-    return prometheusExporterPort;
   }
 
   public String getUsername() {
