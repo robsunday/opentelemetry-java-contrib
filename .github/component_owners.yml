@@ -65,6 +65,7 @@ components:
     - jeanbisutti
   samplers:
     - trask
+    - jack-berg
   static-instrumenter:
     - anosek-an
   kafka-exporter:
