@@ -7,18 +7,12 @@ package io.opentelemetry.contrib.jmxscraper.config;
 
 import static io.opentelemetry.contrib.jmxscraper.util.StringUtils.isBlank;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-@SuppressWarnings({"SystemOut", "SystemExitOutsideMain"})
 public class JmxScraperConfigFactory {
   private static final String PREFIX = "otel.";
   static final String SERVICE_URL = PREFIX + "jmx.service.url";
@@ -64,56 +58,7 @@ public class JmxScraperConfigFactory {
 
   private Properties properties = new Properties();
 
-  /**
-   * Create {@link JmxScraperConfig} object basing on command line options
-   *
-   * @param args application commandline arguments
-   */
-  public JmxScraperConfig createConfigFromArgs(List<String> args) {
-    if (!args.isEmpty() && (args.size() != 2 || !args.get(0).equalsIgnoreCase("-config"))) {
-      System.out.println(
-          "Usage: java io.opentelemetry.contrib.jmxscraper.JmxScraper "
-              + "-config <path_to_config.properties or - for stdin>");
-      System.exit(1);
-    }
-
-    Properties loadedProperties = new Properties();
-    if (args.size() == 2) {
-      String path = args.get(1);
-      if (path.trim().equals("-")) {
-        loadPropertiesFromStdin(loadedProperties);
-      } else {
-        loadPropertiesFromPath(loadedProperties, path);
-      }
-    }
-
-    JmxScraperConfig config = createConfig(loadedProperties);
-    validateConfig(config);
-    populateJmxSystemProperties();
-
-    return config;
-  }
-
-  private static void loadPropertiesFromStdin(Properties props) {
-    try (InputStream is = new DataInputStream(System.in)) {
-      props.load(is);
-    } catch (IOException e) {
-      System.out.println("Failed to read config properties from stdin: " + e.getMessage());
-      System.exit(1);
-    }
-  }
-
-  private static void loadPropertiesFromPath(Properties props, String path) {
-    try (InputStream is = Files.newInputStream(Paths.get(path))) {
-      props.load(is);
-    } catch (IOException e) {
-      System.out.println(
-          "Failed to read config properties file at '" + path + "': " + e.getMessage());
-      System.exit(1);
-    }
-  }
-
-  JmxScraperConfig createConfig(Properties props) {
+  public JmxScraperConfig createConfig(Properties props) throws ConfigurationException {
     properties = new Properties();
     // putAll() instead of using constructor defaults
     // to ensure they will be recorded to underlying map
@@ -148,6 +93,9 @@ public class JmxScraperConfigFactory {
 
     config.registrySsl = Boolean.parseBoolean(properties.getProperty(REGISTRY_SSL));
 
+    validateConfig(config);
+    populateJmxSystemProperties();
+
     return config;
   }
 
@@ -168,7 +116,7 @@ public class JmxScraperConfigFactory {
         });
   }
 
-  private int getProperty(String key, int defaultValue) {
+  private int getProperty(String key, int defaultValue) throws ConfigurationException {
     String propVal = properties.getProperty(key);
     if (propVal == null) {
       return defaultValue;
@@ -191,7 +139,8 @@ public class JmxScraperConfigFactory {
     return propVal;
   }
 
-  private int getAndSetPropertyIfUndefined(String key, int defaultValue) {
+  private int getAndSetPropertyIfUndefined(String key, int defaultValue)
+      throws ConfigurationException {
     int propVal = getProperty(key, defaultValue);
     if (propVal == defaultValue) {
       properties.setProperty(key, String.valueOf(defaultValue));
@@ -200,7 +149,7 @@ public class JmxScraperConfigFactory {
   }
 
   /** Will determine if parsed config is complete, setting any applicable values and defaults. */
-  void validateConfig(JmxScraperConfig config) {
+  private static void validateConfig(JmxScraperConfig config) throws ConfigurationException {
     if (isBlank(config.serviceUrl)) {
       throw new ConfigurationException(SERVICE_URL + " must be specified.");
     }

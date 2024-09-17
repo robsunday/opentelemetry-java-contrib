@@ -38,7 +38,6 @@ public class JmxClient {
 
   public JmxClient(JmxScraperConfig config) throws MalformedURLException {
     this.url = new JMXServiceURL(config.getServiceUrl());
-    ;
     this.username = config.getUsername();
     this.password = config.getPassword();
     this.realm = config.getRealm();
