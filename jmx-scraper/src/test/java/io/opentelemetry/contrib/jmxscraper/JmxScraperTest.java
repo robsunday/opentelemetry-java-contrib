@@ -7,16 +7,15 @@ package io.opentelemetry.contrib.jmxscraper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 import io.opentelemetry.contrib.jmxscraper.config.ConfigurationException;
 import io.opentelemetry.contrib.jmxscraper.config.JmxScraperConfig;
-import io.opentelemetry.contrib.jmxscraper.config.JmxScraperConfigFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
 class JmxScraperTest {
@@ -24,10 +23,9 @@ class JmxScraperTest {
   void shouldThrowExceptionWhenInvalidCommandLineArgsProvided() {
     // Given
     List<String> emptyArgs = Collections.singletonList("-nonExistentOption");
-    JmxScraperConfigFactory configFactoryMock = mock(JmxScraperConfigFactory.class);
 
     // When and Then
-    assertThatThrownBy(() -> JmxScraper.createConfigFromArgs(emptyArgs, configFactoryMock))
+    assertThatThrownBy(() -> JmxScraper.parseArgs(emptyArgs))
         .isInstanceOf(ArgumentsParsingException.class);
   }
 
@@ -35,10 +33,9 @@ class JmxScraperTest {
   void shouldThrowExceptionWhenTooManyCommandLineArgsProvided() {
     // Given
     List<String> args = Arrays.asList("-config", "path", "-nonExistentOption");
-    JmxScraperConfigFactory configFactoryMock = mock(JmxScraperConfigFactory.class);
 
     // When and Then
-    assertThatThrownBy(() -> JmxScraper.createConfigFromArgs(args, configFactoryMock))
+    assertThatThrownBy(() -> JmxScraper.parseArgs(args))
         .isInstanceOf(ArgumentsParsingException.class);
   }
 
@@ -49,10 +46,10 @@ class JmxScraperTest {
     String filePath =
         ClassLoader.getSystemClassLoader().getResource("validConfig.properties").getPath();
     List<String> args = Arrays.asList("-config", filePath);
-    JmxScraperConfigFactory configFactory = new JmxScraperConfigFactory();
 
     // When
-    JmxScraperConfig config = JmxScraper.createConfigFromArgs(args, configFactory);
+    JmxScraperConfig config =
+        JmxScraperConfig.fromProperties(JmxScraper.parseArgs(args), new Properties());
 
     // Then
     assertThat(config).isNotNull();
@@ -67,10 +64,10 @@ class JmxScraperTest {
       // Given
       System.setIn(stream);
       List<String> args = Arrays.asList("-config", "-");
-      JmxScraperConfigFactory configFactory = new JmxScraperConfigFactory();
 
       // When
-      JmxScraperConfig config = JmxScraper.createConfigFromArgs(args, configFactory);
+      JmxScraperConfig config =
+          JmxScraperConfig.fromProperties(JmxScraper.parseArgs(args), new Properties());
 
       // Then
       assertThat(config).isNotNull();

@@ -5,10 +5,8 @@
 
 package io.opentelemetry.contrib.jmxscraper;
 
-import io.opentelemetry.contrib.jmxscraper.client.JmxRemoteClient;
 import io.opentelemetry.contrib.jmxscraper.config.ConfigurationException;
 import io.opentelemetry.contrib.jmxscraper.config.JmxScraperConfig;
-import io.opentelemetry.contrib.jmxscraper.config.JmxScraperConfigFactory;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
 import javax.management.MBeanServerConnection;
@@ -24,8 +21,9 @@ import javax.management.remote.JMXConnector;
 
 public class JmxScraper {
   private static final Logger logger = Logger.getLogger(JmxScraper.class.getName());
+  private static final String CONFIG_ARG = "-config";
 
-  private final JmxRemoteClient client;
+  private final JmxConnectorBuilder client;
 
   // TODO depend on instrumentation 2.9.0 snapshot
   // private final JmxMetricInsight service;
@@ -37,14 +35,19 @@ public class JmxScraper {
    */
   @SuppressWarnings({"SystemOut", "SystemExitOutsideMain"})
   public static void main(String[] args) {
-    JmxScraperConfig config;
-    JmxScraper jmxScraper = null;
     try {
-      JmxScraperConfigFactory factory = new JmxScraperConfigFactory();
-      config = JmxScraper.createConfigFromArgs(Arrays.asList(args), factory);
-      jmxScraper = new JmxScraper(config);
+      JmxScraperConfig config =
+          JmxScraperConfig.fromProperties(parseArgs(Arrays.asList(args)), System.getProperties());
+      // propagate effective user-provided configuration to JVM system properties
+      config.propagateSystemProperties();
+      // TODO: depend on instrumentation 2.9.0 snapshot
+      // service = JmxMetricInsight.createService(GlobalOpenTelemetry.get(),
+      // config.getIntervalMilliseconds());
+      JmxScraper jmxScraper = new JmxScraper(JmxConnectorBuilder.createNew(config.getServiceUrl()));
+      jmxScraper.start();
 
     } catch (ArgumentsParsingException e) {
+      System.err.println("ERROR: " + e.getMessage());
       System.err.println(
           "Usage: java -jar <path_to_jmxscraper.jar> "
               + "-config <path_to_config.properties or - for stdin>");
@@ -52,10 +55,6 @@ public class JmxScraper {
     } catch (ConfigurationException e) {
       System.err.println(e.getMessage());
       System.exit(1);
-    }
-
-    try {
-      Objects.requireNonNull(jmxScraper).start();
     } catch (IOException e) {
       System.err.println("Unable to connect " + e.getMessage());
       System.exit(2);
@@ -63,60 +62,60 @@ public class JmxScraper {
   }
 
   /**
-   * Create {@link JmxScraperConfig} object basing on command line options
+   * Create {@link Properties} from command line options
    *
    * @param args application commandline arguments
    */
-  static JmxScraperConfig createConfigFromArgs(List<String> args, JmxScraperConfigFactory factory)
+  static Properties parseArgs(List<String> args)
       throws ArgumentsParsingException, ConfigurationException {
-    if (!args.isEmpty() && (args.size() != 2 || !args.get(0).equalsIgnoreCase("-config"))) {
-      throw new ArgumentsParsingException();
+
+    if (args.isEmpty()) {
+      // empty properties from stdin or external file
+      // config could still be provided through JVM system properties
+      return new Properties();
+    }
+    if (args.size() != 2) {
+      throw new ArgumentsParsingException("exactly two arguments expected, got " + args.size());
+    }
+    if (!args.get(0).equalsIgnoreCase(CONFIG_ARG)) {
+      throw new ArgumentsParsingException("unexpected first argument must be '" + CONFIG_ARG + "'");
     }
 
-    Properties loadedProperties = new Properties();
-    if (args.size() == 2) {
-      String path = args.get(1);
-      if (path.trim().equals("-")) {
-        loadPropertiesFromStdin(loadedProperties);
-      } else {
-        loadPropertiesFromPath(loadedProperties, path);
-      }
+    String path = args.get(1);
+    if (path.trim().equals("-")) {
+      return loadPropertiesFromStdin();
+    } else {
+      return loadPropertiesFromPath(path);
     }
-
-    return factory.createConfig(loadedProperties);
   }
 
-  private static void loadPropertiesFromStdin(Properties props) throws ConfigurationException {
+  private static Properties loadPropertiesFromStdin() throws ConfigurationException {
+    Properties properties = new Properties();
     try (InputStream is = new DataInputStream(System.in)) {
-      props.load(is);
+      properties.load(is);
+      return properties;
     } catch (IOException e) {
       throw new ConfigurationException("Failed to read config properties from stdin", e);
     }
   }
 
-  private static void loadPropertiesFromPath(Properties props, String path)
-      throws ConfigurationException {
+  private static Properties loadPropertiesFromPath(String path) throws ConfigurationException {
+    Properties properties = new Properties();
     try (InputStream is = Files.newInputStream(Paths.get(path))) {
-      props.load(is);
+      properties.load(is);
+      return properties;
     } catch (IOException e) {
       throw new ConfigurationException("Failed to read config properties file: '" + path + "'", e);
     }
   }
 
-  JmxScraper(JmxScraperConfig config) throws ConfigurationException {
-    String serviceUrl = config.getServiceUrl();
-    int interval = config.getIntervalMilliseconds();
-    if (interval < 0) {
-      throw new ConfigurationException("interval must be positive");
-    }
-    this.client = JmxRemoteClient.createNew(serviceUrl);
-    // TODO: depend on instrumentation 2.9.0 snapshot
-    // this.service = JmxMetricInsight.createService(GlobalOpenTelemetry.get(), interval);
+  JmxScraper(JmxConnectorBuilder client) {
+    this.client = client;
   }
 
   private void start() throws IOException {
 
-    JMXConnector connector = client.connect();
+    JMXConnector connector = client.build();
 
     @SuppressWarnings("unused")
     MBeanServerConnection connection = connector.getMBeanServerConnection();
