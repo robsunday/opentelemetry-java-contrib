@@ -5,9 +5,11 @@
 
 package io.opentelemetry.contrib.jmxscraper.assertions;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Utility class implementing convenience static methods to construct data point attribute matchers
@@ -40,21 +42,30 @@ public class DataPointAttributes {
   }
 
   /**
-   * Create a set of attribute matchers that should be used to verify set of data point attributes.
+   * Create a group of attribute matchers that should be used to verify list of data point
+   * attributes.
    *
-   * @param attributes list of matchers to create set. It must contain matchers with unique names.
-   * @return set of unique attribute matchers
+   * @param attributes list of matchers to create group from. It must contain matchers with unique
+   *     names.
+   * @return list of unique attribute matchers
    * @throws IllegalArgumentException if provided list contains two or more matchers with the same
    *     name.
-   * @see MetricAssert#hasDataPointsWithAttributes(Set[]) for detailed description of the algorithm
-   *     used for matching
+   * @see MetricAssert#hasDataPointsWithAttributes(Collection[]) for detailed description of the
+   *     algorithm used for matching
    */
-  public static Set<AttributeMatcher> attributeSet(AttributeMatcher... attributes) {
-    Set<AttributeMatcher> matcherSet = Arrays.stream(attributes).collect(Collectors.toSet());
-    if (matcherSet.size() < attributes.length) {
-      throw new IllegalArgumentException(
-          "Duplicated matchers found in " + Arrays.toString(attributes));
+  public static List<AttributeMatcher> attributeSet(AttributeMatcher... attributes) {
+    List<AttributeMatcher> matcherGroup = new ArrayList<>(attributes.length);
+    Set<String> registeredAttributeMatcherNames = new HashSet<>(attributes.length);
+
+    for (AttributeMatcher attributeMatcher : attributes) {
+      if (registeredAttributeMatcherNames.contains(attributeMatcher.getAttributeName())) {
+        throw new IllegalArgumentException(
+            "Duplicate matcher with name: " + attributeMatcher.getAttributeName());
+      }
+      registeredAttributeMatcherNames.add(attributeMatcher.getAttributeName());
+      matcherGroup.add(attributeMatcher);
     }
-    return matcherSet;
+
+    return matcherGroup;
   }
 }

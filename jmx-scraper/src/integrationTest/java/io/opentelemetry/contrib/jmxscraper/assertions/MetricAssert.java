@@ -258,7 +258,7 @@ public class MetricAssert extends AbstractAssert<MetricAssert, Metric> {
   @CanIgnoreReturnValue
   @SuppressWarnings("varargs") // required to avoid warning
   public final MetricAssert hasDataPointsWithAttributes(
-      Set<AttributeMatcher>... attributeMatchers) {
+      Collection<AttributeMatcher>... attributeMatchers) {
     return checkDataPoints(
         dataPoints -> {
           dataPointsCommonCheck(dataPoints);
@@ -293,12 +293,17 @@ public class MetricAssert extends AbstractAssert<MetricAssert, Metric> {
   }
 
   private static boolean matchAttributes(
-      Set<AttributeMatcher> attributeMatchers, Map<String, String> dataPointAttributes) {
+      Collection<AttributeMatcher> attributeMatchers, Map<String, String> dataPointAttributes) {
     if (attributeMatchers.size() != dataPointAttributes.size()) {
       return false;
     }
+
     for (AttributeMatcher matcher : attributeMatchers) {
-      String attributeValue = dataPointAttributes.get(matcher.getAttributeName());
+      String attributeName = matcher.getAttributeName();
+      if (!dataPointAttributes.containsKey(attributeName)) {
+        return false;
+      }
+      String attributeValue = dataPointAttributes.get(attributeName);
       if (!matcher.matchesValue(attributeValue)) {
         return false;
       }
