@@ -54,7 +54,7 @@ public class DataPointAttributes {
    *     algorithm used for matching
    */
   public static List<AttributeMatcher> attributeSet(AttributeMatcher... attributes) {
-    List<AttributeMatcher> matcherGroup = new ArrayList<>(attributes.length);
+    List<AttributeMatcher> matcherList = new ArrayList<>(attributes.length);
     Set<String> registeredAttributeMatcherNames = new HashSet<>(attributes.length);
 
     for (AttributeMatcher attributeMatcher : attributes) {
@@ -63,9 +63,9 @@ public class DataPointAttributes {
             "Duplicate matcher with name: " + attributeMatcher.getAttributeName());
       }
       registeredAttributeMatcherNames.add(attributeMatcher.getAttributeName());
-      matcherGroup.add(attributeMatcher);
+      matcherList.add(attributeMatcher);
     }
 
-    return matcherGroup;
+    return matcherList;
   }
 }
