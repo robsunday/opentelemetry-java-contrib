@@ -12,7 +12,7 @@ import io.opentelemetry.contrib.jmxscraper.JmxScraperContainer;
 import io.opentelemetry.contrib.jmxscraper.assertions.AttributeMatcher;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Set;
+import java.util.List;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
@@ -184,7 +184,7 @@ public class CassandraIntegrationTest extends TargetSystemIntegrationTest {
                         errorCountAttributes("Write", "Unavailable")));
   }
 
-  private static Set<AttributeMatcher> errorCountAttributes(String operation, String status) {
+  private static List<AttributeMatcher> errorCountAttributes(String operation, String status) {
     return attributeSet(attribute("operation", operation), attribute("status", status));
   }
 }

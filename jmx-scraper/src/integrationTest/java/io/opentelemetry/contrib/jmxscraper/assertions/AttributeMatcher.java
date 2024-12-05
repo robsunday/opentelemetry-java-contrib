@@ -29,6 +29,7 @@ public class AttributeMatcher {
    * @param attributeValue attribute value
    */
   AttributeMatcher(String attributeName, @Nullable String attributeValue) {
+    Objects.requireNonNull(attributeName, "Null attribute name");
     this.attributeName = attributeName;
     this.attributeValue = attributeValue;
   }
@@ -40,25 +41,6 @@ public class AttributeMatcher {
    */
   public String getAttributeName() {
     return attributeName;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof AttributeMatcher)) {
-      return false;
-    }
-    AttributeMatcher other = (AttributeMatcher) o;
-    // Do not attributeValue into account so AttributeMatcher instances can be stored in collections
-    // with guarantee of uniqueness per attribute
-    return Objects.equals(attributeName, other.attributeName);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(attributeName);
   }
 
   @Override
@@ -75,7 +57,7 @@ public class AttributeMatcher {
    * @param value a value to be matched
    * @return true if this matcher is matching provided value, false otherwise.
    */
-  boolean matchesValue(String value) {
+  public boolean matchesValue(String value) {
     return (attributeValue == null) || Objects.equals(attributeValue, value);
   }
 }
